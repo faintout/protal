@@ -1,0 +1,16 @@
+name = "aurora-portal"
+main = "worker-dist.js"
+compatibility_date = "2024-01-01"
+
+# 本地开发: wrangler dev
+# 部署:     wrangler deploy
+
+[[kv_namespaces]]
+binding = "AURORA_KV"
+id = "8cb4dd77c3574ce189f458998ebc97aa"
+preview_id = "549bb0f7ed1f4bdea60c0681e86e5dab"
+
+# 可选: 自定义域名路由
+# [[routes]]
+# pattern = "portal.yourdomain.com/*"
+# zone_name = "yourdomain.com"

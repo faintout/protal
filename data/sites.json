@@ -1,0 +1,123 @@
+{
+  "profile": {
+    "title": "极光导航",
+    "subtitle": "上网，从这开始！",
+    "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=portal&backgroundColor=6366f1"
+  },
+  "categories": [
+    "常用推荐",
+    "AI 人工智能",
+    "影视影音",
+    "音乐听歌",
+    "开发编程",
+    "实用工具",
+    "学习资讯",
+    "代理"
+  ],
+  "sites": [
+    {
+      "id": "site-1",
+      "name": "ChatGPT",
+      "url": "https://chatgpt.com",
+      "category": "AI 人工智能",
+      "desc": "OpenAI 智能对话与生产力大模型",
+      "icon": "https://chatgpt.com/favicon.ico"
+    },
+    {
+      "id": "site-2",
+      "name": "Claude",
+      "url": "https://claude.ai",
+      "category": "AI 人工智能",
+      "desc": "Anthropic 超强编码与深度思考模型",
+      "icon": "https://claude.ai/favicon.ico"
+    },
+    {
+      "id": "site-3",
+      "name": "DeepSeek",
+      "url": "https://chat.deepseek.com",
+      "category": "AI 人工智能",
+      "desc": "国产开源领军智能推理大模型",
+      "icon": "https://chat.deepseek.com/favicon.ico"
+    },
+    {
+      "id": "site-1790761752327-w0x03",
+      "name": "beat.ccwu.cc",
+      "url": "https://beat.ccwu.cc/admin",
+      "category": "代理",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790761787199-xwsvm",
+      "name": "diff.us.ci",
+      "url": "https://diff.us.ci/admin",
+      "category": "代理",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790761922833-lhaln",
+      "name": "139青龙",
+      "url": "http://139.9.106.182:5700/dashboard",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790761938922-oedn5",
+      "name": "1.95青龙",
+      "url": "http://1.95.69.176:5700/login",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790761959379-nl04y",
+      "name": "个人导航",
+      "url": "http://1.95.69.176:8090/",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790761983684-08i17",
+      "name": "139青龙Tools",
+      "url": "http://139.9.106.182:15000/#/",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790762010505-nbiye",
+      "name": "哪吒探针",
+      "url": "http://139.9.106.182:8008/",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": "https://www.google.com/s2/favicons?domain=139.9.106.182&sz=64"
+    },
+    {
+      "id": "site-1790762072271-ofsyw",
+      "name": "glados历史图表",
+      "url": "https://glados.yhnh5.eu.org/checkinChart",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": "https://favicon.yandex.net/favicon/glados.yhnh5.eu.org"
+    },
+    {
+      "id": "site-1790762197951-47nnv",
+      "name": "docker代理",
+      "url": "https://docker.sleep.us.ci/",
+      "category": "代理",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790762264088-8wcob",
+      "name": "Cloudflare 临时邮件",
+      "url": "https://mail.yhnh5.eu.org/",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": ""
+    }
+  ]
+}
