@@ -1,14 +1,14 @@
 /**
  * 极光导航 - 本地 Node.js 服务器
- * 功能: 静态文件服务 + 站点数据持久化 + SSE 粘贴板实时同步
+ * 功能: 静态文件服务 + 站点数据持久化 + 粘贴板 API
  * 运行: node server.js
- * 支持: 局域网多设备实时联动（自动打印本机 IP + 二维码地址）
+ * 用途: 本机开发；跨设备共享请部署 Cloudflare Worker
  */
 
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
+const fetchNodeSiteMetadata = require('./site-metadata-node');
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
@@ -37,7 +37,7 @@ function getMime(ext) {
 }
 
 function sendJson(res, data, status = 200) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
   res.end(JSON.stringify(data));
 }
 
@@ -60,7 +60,7 @@ function readBody(req) {
 function readSites() {
   // 优先读取自定义 sites.json，不存在时回退至 default-sites.json
   const target = fs.existsSync(SITES_FILE) ? SITES_FILE : path.join(DATA_DIR, 'default-sites.json');
-  try { return JSON.parse(fs.readFileSync(target, 'utf-8')); } catch { return { profile: {}, categories: [], sites: [] }; }
+  return JSON.parse(fs.readFileSync(target, 'utf-8'));
 }
 
 function writeSites(data) {
@@ -68,25 +68,17 @@ function writeSites(data) {
 }
 
 function readClip() {
-  try { return fs.existsSync(CLIP_FILE) ? fs.readFileSync(CLIP_FILE, 'utf-8') : ''; } catch { return ''; }
+  try {
+    return { content: fs.readFileSync(CLIP_FILE, 'utf-8'), updatedAt: fs.statSync(CLIP_FILE).mtimeMs };
+  } catch (error) {
+    if (error.code === 'ENOENT') return { content: '', updatedAt: 0 };
+    throw error;
+  }
 }
 
 function writeClip(content) {
   fs.writeFileSync(CLIP_FILE, content, 'utf-8');
-}
-
-/* =====================================================================
-   SSE (Server-Sent Events) - 多设备实时粘贴板广播
-   ===================================================================== */
-const sseClients = new Set();
-
-function broadcastClip(content, excludeRes = null) {
-  const msg = `data: ${JSON.stringify({ type: 'clip-update', content })}\n\n`;
-  sseClients.forEach(client => {
-    if (client !== excludeRes) {
-      try { client.write(msg); } catch { sseClients.delete(client); }
-    }
-  });
+  return { content, updatedAt: fs.statSync(CLIP_FILE).mtimeMs };
 }
 
 /* =====================================================================
@@ -127,58 +119,48 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   /* ---- API 路由 ---- */
+  // 获取公开网站的标题与图标（跨域请求由服务器完成）
+  if (pathname === '/api/site-metadata' && method === 'GET') {
+    try {
+      return sendJson(res, await fetchNodeSiteMetadata(url.searchParams.get('url')));
+    } catch (error) {
+      return sendError(res, error.status ? error.message : '无法获取网站信息，请手动填写', error.status || 502);
+    }
+  }
+
   // 获取站点数据
   if (pathname === '/api/sites' && method === 'GET') {
-    return sendJson(res, readSites());
+    try { return sendJson(res, readSites()); }
+    catch { return sendError(res, '站点存储暂不可用，请稍后重试', 503); }
   }
 
   // 保存站点数据
   if (pathname === '/api/sites' && method === 'POST') {
-    const body = await readBody(req);
-    writeSites(body);
-    return sendJson(res, { ok: true });
+    try {
+      const body = await readBody(req);
+      writeSites(body);
+      return sendJson(res, { ok: true });
+    } catch { return sendError(res, '站点存储暂不可用，请稍后重试', 503); }
   }
 
   // 获取粘贴板内容
   if (pathname === '/api/clipboard' && method === 'GET') {
-    return sendJson(res, { content: readClip() });
+    try { return sendJson(res, readClip()); }
+    catch { return sendError(res, '粘贴板存储暂不可用，请稍后重试', 503); }
   }
 
-  // 更新粘贴板内容并广播
+  // 更新粘贴板内容，返回已保存的版本
   if (pathname === '/api/clipboard' && method === 'POST') {
-    const body = await readBody(req);
-    const content = typeof body === 'string' ? body : (body.content ?? '');
-    writeClip(content);
-    broadcastClip(content, res);
-    return sendJson(res, { ok: true });
+    try {
+      const body = await readBody(req);
+      if (!body || typeof body.content !== 'string') {
+        return sendError(res, 'content 必须是字符串', 400);
+      }
+      return sendJson(res, writeClip(body.content));
+    } catch { return sendError(res, '粘贴板存储暂不可用，请稍后重试', 503); }
   }
 
-  // SSE 长连接（粘贴板多端实时广播）
-  if (pathname === '/api/clipboard/sse') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    });
-
-    // 立刻推送当前内容
-    const current = readClip();
-    res.write(`data: ${JSON.stringify({ type: 'clip-update', content: current })}\n\n`);
-
-    sseClients.add(res);
-
-    // 心跳保活 (15s)
-    const heartbeat = setInterval(() => {
-      try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
-    }, 15000);
-
-    req.on('close', () => {
-      clearInterval(heartbeat);
-      sseClients.delete(res);
-    });
-    return;
-  }
+  if (pathname.startsWith('/api/')) return sendError(res, 'Not Found', 404);
 
   /* ---- 静态文件服务 ---- */
   let filePath = path.join(__dirname, 'public', pathname === '/' ? 'index.html' : pathname);
@@ -202,35 +184,15 @@ const server = http.createServer(async (req, res) => {
 });
 
 /* =====================================================================
-   启动与局域网信息输出
+   启动本机开发服务
    ===================================================================== */
 server.listen(PORT, '0.0.0.0', () => {
-  const ifaces = os.networkInterfaces();
-  let localIP = 'localhost';
-
-  // 获取本机局域网 IP
-  for (const iface of Object.values(ifaces)) {
-    for (const config of iface) {
-      if (config.family === 'IPv4' && !config.internal) {
-        localIP = config.address;
-        break;
-      }
-    }
-    if (localIP !== 'localhost') break;
-  }
-
-  const localUrl  = `http://localhost:${PORT}`;
-  const lanUrl    = `http://${localIP}:${PORT}`;
-
   console.log('\n');
-  console.log('  ✨ 极光导航 (Aurora Portal) 已启动！');
+  console.log('  ✨ 极光导航 (Aurora Portal) 本机开发服务已启动！');
   console.log('  ─────────────────────────────────────');
-  console.log(`  🌐 本机地址:      ${localUrl}`);
-  console.log(`  📡 局域网地址:    ${lanUrl}`);
-  console.log(`  📋 粘贴板同步:    ${lanUrl}/#clipboard`);
+  console.log(`  🌐 本机地址: http://localhost:${PORT}`);
+  console.log('  ☁️ 跨设备共享: 部署后在各设备打开同一 HTTPS 地址');
   console.log('  ─────────────────────────────────────');
-  console.log(`  手机扫码访问（同一 WiFi 下）:`);
-  console.log(`  二维码: https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(lanUrl)}`);
   console.log('\n  按 Ctrl+C 停止服务\n');
 });
 

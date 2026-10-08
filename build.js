@@ -14,6 +14,7 @@ const workerTemplate = fs.readFileSync(path.join(__dirname, 'worker.js'), 'utf-8
 const htmlContent    = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf-8');
 const cssContent     = fs.readFileSync(path.join(__dirname, 'public', 'css', 'style.css'), 'utf-8');
 const defaultData    = fs.readFileSync(path.join(__dirname, 'data', 'default-sites.json'), 'utf-8');
+const metadataCode   = fs.readFileSync(path.join(__dirname, 'site-metadata.js'), 'utf-8');
 
 // 读取前端 JS 并将 marked.min.js 的 CDN 引用保留（Worker 只是转发 JS 文件，不需要内联）
 let jsContent = fs.readFileSync(path.join(__dirname, 'public', 'js', 'app.js'), 'utf-8');
@@ -31,10 +32,11 @@ const cssEscaped  = escapeForTemplateLiteral(cssContent);
 const jsEscaped   = escapeForTemplateLiteral(jsContent);
 
 let workerDist = workerTemplate
-  .replace('`__HTML_CONTENT__`', `\`${htmlEscaped}\``)
-  .replace('`__CSS_CONTENT__`',  `\`${cssEscaped}\``)
-  .replace('`__JS_CONTENT__`',   `\`${jsEscaped}\``)
-  .replace('__DEFAULT_DATA__',   defaultData.trim());
+  .replace('__SITE_METADATA_CODE__', () => metadataCode)
+  .replace('`__HTML_CONTENT__`', () => `\`${htmlEscaped}\``)
+  .replace('`__CSS_CONTENT__`',  () => `\`${cssEscaped}\``)
+  .replace('`__JS_CONTENT__`',   () => `\`${jsEscaped}\``)
+  .replace('__DEFAULT_DATA__',  () => defaultData.trim());
 
 fs.writeFileSync(path.join(__dirname, 'worker-dist.js'), workerDist, 'utf-8');
 

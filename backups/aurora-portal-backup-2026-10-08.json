@@ -7,21 +7,21 @@
   "categories": [
     "常用推荐",
     "AI 人工智能",
-    "代理",
     "影视影音",
     "音乐听歌",
     "开发编程",
     "实用工具",
-    "学习资讯"
+    "学习资讯",
+    "代理"
   ],
   "sites": [
     {
-      "id": "site-1790761938922-oedn5",
-      "name": "1.95青龙",
-      "url": "http://1.95.69.176:5700/login",
+      "id": "site-1",
+      "name": "ChatGPT",
+      "url": "https://chatgpt.com",
       "category": "AI 人工智能",
-      "desc": "",
-      "icon": ""
+      "desc": "OpenAI 智能对话与生产力大模型",
+      "icon": "https://chatgpt.com/favicon.ico"
     },
     {
       "id": "site-2",
@@ -32,12 +32,12 @@
       "icon": "https://claude.ai/favicon.ico"
     },
     {
-      "id": "site-1",
-      "name": "ChatGPT",
-      "url": "https://chatgpt.com",
+      "id": "site-3",
+      "name": "DeepSeek",
+      "url": "https://chat.deepseek.com",
       "category": "AI 人工智能",
-      "desc": "OpenAI 智能对话与生产力大模型",
-      "icon": "https://chatgpt.com/favicon.ico"
+      "desc": "国产开源领军智能推理大模型",
+      "icon": "https://chat.deepseek.com/favicon.ico"
     },
     {
       "id": "site-1790761752327-w0x03",
@@ -59,6 +59,14 @@
       "id": "site-1790761922833-lhaln",
       "name": "139青龙",
       "url": "http://139.9.106.182:5700/dashboard",
+      "category": "常用推荐",
+      "desc": "",
+      "icon": ""
+    },
+    {
+      "id": "site-1790761938922-oedn5",
+      "name": "1.95青龙",
+      "url": "http://1.95.69.176:5700/login",
       "category": "常用推荐",
       "desc": "",
       "icon": ""
@@ -110,14 +118,6 @@
       "category": "常用推荐",
       "desc": "",
       "icon": ""
-    },
-    {
-      "id": "site-3",
-      "name": "DeepSeek",
-      "url": "https://chat.deepseek.com",
-      "category": "AI 人工智能",
-      "desc": "国产开源领军智能推理大模型",
-      "icon": "https://chat.deepseek.com/favicon.ico"
     }
   ]
 }
