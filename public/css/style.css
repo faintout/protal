@@ -929,6 +929,21 @@ html.site-dragging {
   box-shadow: 0 0 8px var(--success);
 }
 
+.live-indicator.dirty {
+  background: var(--warning);
+  box-shadow: 0 0 8px var(--warning);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
 .sep {
   color: rgba(255, 255, 255, 0.15);
 }
@@ -1166,6 +1181,21 @@ html.site-dragging {
 .drawer-footer {
   padding: 14px;
   border-top: 1px solid var(--glass-border);
+}
+
+.drawer-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.drawer-footer-actions #drawerRefreshBtn {
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.drawer-footer-actions #drawerCopyBtn {
+  flex: 1 1 auto;
+  justify-content: center;
 }
 
 .w-full {
@@ -1676,3 +1706,150 @@ button:disabled {
     margin-left: 0;
   }
 }
+
+/* =====================================================================
+   管理员权限与弹窗模块专属样式
+   ===================================================================== */
+.admin-auth-btn {
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.admin-auth-btn.authed {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+}
+
+.admin-auth-btn.authed:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.65);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+}
+
+.admin-dialog {
+  max-width: 460px;
+}
+
+.admin-modal-body {
+  padding: 20px 24px;
+}
+
+.admin-badge-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.admin-icon-circle {
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-banner-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 3px;
+}
+
+.admin-banner-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.admin-banner-desc strong {
+  color: #a5b4fc;
+}
+
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.btn-toggle-pwd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+
+.btn-toggle-pwd:hover {
+  color: var(--text-primary);
+}
+
+.admin-status-card {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.status-indicator-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #34d399;
+  margin-bottom: 6px;
+}
+
+.status-indicator-tag .dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse-ring 2s infinite;
+}
+
+.status-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.section-sub-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 10px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.modal-actions.space-between {
+  justify-content: space-between;
+}
+

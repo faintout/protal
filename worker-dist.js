@@ -340,6 +340,11 @@ const HTML_CONTENT = `<!DOCTYPE html>
       </span>
     </div>
     <div class="top-actions">
+      <!-- 管理员入口 -->
+      <button class="icon-btn admin-auth-btn" id="adminAuthBtn" title="管理员设置">
+        <svg id="adminAuthIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+        <span class="btn-text" id="adminAuthBtnText">管理员</span>
+      </button>
       <!-- 云端站点扫码互联 -->
       <button class="icon-btn" id="qrShareBtn" title="跨设备扫码同步">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M7 7h.01M17 7h.01M7 17h.01M17 17h.01"></path></svg>
@@ -496,6 +501,10 @@ const HTML_CONTENT = `<!DOCTYPE html>
               <button class="toggle-btn active" id="btnModeEdit">编辑模式</button>
               <button class="toggle-btn" id="btnModePreview">Markdown 预览</button>
             </div>
+            <button class="btn-secondary" id="btnRefreshClip" title="手动获取云端最新内容">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>刷新</span>
+            </button>
             <button class="btn-secondary" id="btnPasteFromSys" title="从本机剪贴板快速填入">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
               <span>快速粘贴</span>
@@ -510,7 +519,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
 
         <div class="clipboard-editor-body">
           <!-- 实时编辑区域 -->
-          <textarea id="clipTextarea" class="clip-textarea" disabled placeholder="在此输入或粘贴内容，联网后自动上传；其他设备打开同一网址即可共享。"></textarea>
+          <textarea id="clipTextarea" class="clip-textarea" disabled placeholder="在此输入或粘贴内容，编辑完成失焦 (change) 后自动保存；点击“刷新”可拉取云端最新内容。"></textarea>
           
           <!-- Markdown 预览展示面板 -->
           <div id="clipPreviewPanel" class="clip-preview markdown-body" style="display: none;"></div>
@@ -519,7 +528,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
         <div class="clipboard-footer-tips">
           <div class="tip-left">
             <span class="badge-tip">💡 协同说明</span>
-            <span>内容通过服务器共享，每 3 秒检查更新。请确认上传成功后再关闭页面；网络异常时会自动重试。</span>
+            <span>内容通过云端共享，编辑修改失焦 (change) 时自动保存。点击“刷新”获取云端最新内容。</span>
           </div>
           <button class="link-btn" id="clipQrBtn">📱 手机扫码直达本粘贴板</button>
         </div>
@@ -537,10 +546,14 @@ const HTML_CONTENT = `<!DOCTYPE html>
       <button class="drawer-close" id="closeDrawerBtn">✕</button>
     </div>
     <div class="drawer-body">
-      <textarea id="drawerTextarea" class="drawer-textarea" disabled placeholder="内容通过云端与其他设备共享，上传状态显示在页面左上角。"></textarea>
+      <textarea id="drawerTextarea" class="drawer-textarea" disabled placeholder="内容通过云端共享，失焦后自动保存；点击刷新可获取最新内容。"></textarea>
     </div>
-    <div class="drawer-footer">
-      <button class="btn-primary w-full" id="drawerCopyBtn">一键复制便签内容</button>
+    <div class="drawer-footer drawer-footer-actions">
+      <button class="btn-secondary" id="drawerRefreshBtn" title="刷新云端内容">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span>刷新</span>
+      </button>
+      <button class="btn-primary" id="drawerCopyBtn">一键复制便签</button>
     </div>
   </aside>
 
@@ -687,6 +700,85 @@ const HTML_CONTENT = `<!DOCTYPE html>
             <button class="btn-sm" id="btnCopyAddress">复制地址</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 弹窗 4: 管理员登录与设置模态框 ===================== -->
+  <div class="modal-overlay" id="adminModal">
+    <div class="modal-dialog glass-panel admin-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="adminModalTitle">管理员验证</h3>
+        <button class="modal-close" id="closeAdminModalBtn">✕</button>
+      </div>
+
+      <!-- 视图 A: 管理员登录验证视图 -->
+      <div class="modal-body admin-modal-body" id="adminLoginView">
+        <div class="admin-badge-banner">
+          <div class="admin-icon-circle">🔐</div>
+          <div>
+            <h4 class="admin-banner-title">需要管理员权限</h4>
+            <p class="admin-banner-desc">验证管理员密码后，本设备将<strong>永久保持授权</strong>，无需重复输入。</p>
+          </div>
+        </div>
+
+        <form id="adminLoginForm" class="modal-form">
+          <div class="form-group">
+            <label for="adminLoginPwd">管理员密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminLoginPwd" placeholder="请输入管理员密码" required autocomplete="current-password">
+              <button type="button" class="btn-toggle-pwd" id="toggleLoginPwdBtn" title="切换密码显示">👁</button>
+            </div>
+            <small class="form-hint" id="adminLoginHint">💡 初始默认密码为 <strong>admin</strong>，登录后支持自定义修改。</small>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancelAdminModalBtn">取消</button>
+            <button type="submit" class="btn-primary" id="submitAdminLoginBtn">登录并授权</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 视图 B: 管理员控制台与修改密码视图 -->
+      <div class="modal-body admin-modal-body" id="adminManageView" style="display: none;">
+        <div class="admin-status-card">
+          <div class="status-indicator-tag success">
+            <span class="dot"></span> 已永久授权
+          </div>
+          <p class="status-desc">当前设备已拥有最高管理权限。你可以随时修改管理密码或锁定退出。</p>
+        </div>
+
+        <form id="adminChangePwdForm" class="modal-form">
+          <h4 class="section-sub-title">修改管理员密码</h4>
+          <div class="form-group">
+            <label for="adminCurrentPwd">当前密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminCurrentPwd" placeholder="输入当前使用的密码" required autocomplete="current-password">
+              <button type="button" class="btn-toggle-pwd" id="toggleCurrentPwdBtn" title="切换显示">👁</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="adminNewPwd">自定义新密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminNewPwd" placeholder="设置新的管理员密码" minlength="4" required autocomplete="new-password">
+              <button type="button" class="btn-toggle-pwd" id="toggleNewPwdBtn" title="切换显示">👁</button>
+            </div>
+            <small class="form-hint">支持自定义任意字符（不少于4位），设置后立即保存在本设备。</small>
+          </div>
+
+          <div class="form-group">
+            <label for="adminConfirmPwd">确认新密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminConfirmPwd" placeholder="再次输入新密码" minlength="4" required autocomplete="new-password">
+            </div>
+          </div>
+
+          <div class="modal-actions space-between">
+            <button type="button" class="btn-danger-outline" id="btnAdminLogout" title="撤销本设备授权">退出授权并锁定</button>
+            <button type="submit" class="btn-primary" id="saveNewPwdBtn">保存新密码</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -1632,6 +1724,21 @@ html.site-dragging {
   box-shadow: 0 0 8px var(--success);
 }
 
+.live-indicator.dirty {
+  background: var(--warning);
+  box-shadow: 0 0 8px var(--warning);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
 .sep {
   color: rgba(255, 255, 255, 0.15);
 }
@@ -1869,6 +1976,21 @@ html.site-dragging {
 .drawer-footer {
   padding: 14px;
   border-top: 1px solid var(--glass-border);
+}
+
+.drawer-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.drawer-footer-actions #drawerRefreshBtn {
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.drawer-footer-actions #drawerCopyBtn {
+  flex: 1 1 auto;
+  justify-content: center;
 }
 
 .w-full {
@@ -2379,10 +2501,157 @@ button:disabled {
     margin-left: 0;
   }
 }
+
+/* =====================================================================
+   管理员权限与弹窗模块专属样式
+   ===================================================================== */
+.admin-auth-btn {
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.admin-auth-btn.authed {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+}
+
+.admin-auth-btn.authed:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.65);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+}
+
+.admin-dialog {
+  max-width: 460px;
+}
+
+.admin-modal-body {
+  padding: 20px 24px;
+}
+
+.admin-badge-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.admin-icon-circle {
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-banner-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 3px;
+}
+
+.admin-banner-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.admin-banner-desc strong {
+  color: #a5b4fc;
+}
+
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrap input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.btn-toggle-pwd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+
+.btn-toggle-pwd:hover {
+  color: var(--text-primary);
+}
+
+.admin-status-card {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.status-indicator-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #34d399;
+  margin-bottom: 6px;
+}
+
+.status-indicator-tag .dot {
+  width: 8px;
+  height: 8px;
+  background: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse-ring 2s infinite;
+}
+
+.status-desc {
+  font-size: 12.5px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.section-sub-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 10px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.modal-actions.space-between {
+  justify-content: space-between;
+}
+
 `;
 
 // 内嵌 JS（由构建脚本替换）
-const JS_CONTENT = `﻿/**
+const JS_CONTENT = `/**
  * 极光导航 (Aurora Portal) - 前端主逻辑
  * 功能: 网站导航管理 + 多引擎搜索 + 互联网共享粘贴板
  */
@@ -2395,6 +2664,9 @@ const JS_CONTENT = `﻿/**
 const STORAGE_KEY = 'aurora-portal-data-v2';
 const RECENT_KEY = 'aurora-recent-sites-v3';
 const BACKUP_KEY = 'aurora-before-import-v1';
+const ADMIN_PWD_KEY = 'aurora_admin_password';
+const ADMIN_AUTH_KEY = 'aurora_admin_authorized';
+const DEFAULT_ADMIN_PWD = 'admin';
 
 // 搜索引擎配置
 const ENGINES = {
@@ -2506,6 +2778,111 @@ function legacyCopy(text, successMsg, failMsg) {
   toast(ok ? successMsg : failMsg, ok ? 'success' : 'error');
 }
 
+
+/* =====================================================================
+   0.1 管理员权限与密码管理模块
+   ===================================================================== */
+let pendingAdminAction = null;
+
+/** 获取本地管理员密码（未初始化时自动初始化为默认密码 admin） */
+function getAdminPassword() {
+  let pwd = localStorage.getItem(ADMIN_PWD_KEY);
+  if (!pwd) {
+    pwd = DEFAULT_ADMIN_PWD;
+    localStorage.setItem(ADMIN_PWD_KEY, pwd);
+  }
+  return pwd;
+}
+
+/** 检查当前浏览器设备是否拥有永久有效授权 */
+function isAdminAuthorized() {
+  return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
+}
+
+/** 设置授权状态，更新页面顶栏按钮状态 */
+function setAdminAuthorized(authorized) {
+  if (authorized) {
+    localStorage.setItem(ADMIN_AUTH_KEY, 'true');
+  } else {
+    localStorage.removeItem(ADMIN_AUTH_KEY);
+  }
+  updateAdminBtnUI();
+}
+
+/** 更新顶部管理员按钮的外观与图标 */
+function updateAdminBtnUI() {
+  const btn = _qs('#adminAuthBtn');
+  const icon = _qs('#adminAuthIcon');
+  const text = _qs('#adminAuthBtnText');
+  if (!btn) return;
+  const authed = isAdminAuthorized();
+  if (authed) {
+    btn.classList.add('authed');
+    btn.title = '管理员设置（已授权）';
+    if (text) text.textContent = '已授权';
+    if (icon) {
+      icon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 019.9-1"></path>';
+    }
+  } else {
+    btn.classList.remove('authed');
+    btn.title = '管理员登录';
+    if (text) text.textContent = '管理员';
+    if (icon) {
+      icon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path>';
+    }
+  }
+}
+
+/** 打开管理员弹窗 */
+function openAdminModal(mode) {
+  const modal = _qs('#adminModal');
+  const loginView = _qs('#adminLoginView');
+  const manageView = _qs('#adminManageView');
+  const title = _qs('#adminModalTitle');
+  if (!modal) return;
+
+  const authed = isAdminAuthorized();
+  const showManage = mode === 'manage' || (mode !== 'login' && authed);
+
+  if (showManage) {
+    if (title) title.textContent = '管理员控制台';
+    if (loginView) loginView.style.display = 'none';
+    if (manageView) manageView.style.display = 'block';
+    // 重置修改密码表单
+    const changeForm = _qs('#adminChangePwdForm');
+    if (changeForm) changeForm.reset();
+  } else {
+    if (title) title.textContent = '管理员验证';
+    if (loginView) loginView.style.display = 'block';
+    if (manageView) manageView.style.display = 'none';
+    const pwdInput = _qs('#adminLoginPwd');
+    if (pwdInput) {
+      pwdInput.value = '';
+      setTimeout(() => pwdInput.focus(), 150);
+    }
+  }
+
+  modal.classList.add('open');
+}
+
+/** 关闭管理员弹窗 */
+function closeAdminModal() {
+  const modal = _qs('#adminModal');
+  if (modal) modal.classList.remove('open');
+  pendingAdminAction = null;
+}
+
+/** 拦截敏感操作：如未授权则弹窗，验证成功后自动执行回调 */
+function requireAdmin(actionCallback) {
+  if (isAdminAuthorized()) {
+    if (typeof actionCallback === 'function') actionCallback();
+    return true;
+  }
+  pendingAdminAction = actionCallback;
+  openAdminModal('login');
+  toast('此操作需要管理员权限，请先验证', 'warning');
+  return false;
+}
 
 /* ======================================================================
    1. 数据层 (服务器 KV 为主，LocalStorage 为快速缓存)
@@ -3544,120 +3921,208 @@ async function resetDefault() {
    8. 共享粘贴板逻辑
    ===================================================================== */
 let clipContent = '';
-let clipSyncTimer = null;
+let clipSavedContent = '';
 let isPreviewMode = false;
 let clipReady = false;
 let clipDirty = false;
-let clipEditVersion = 0;
 let clipServerTime = 0;
-let clipRequestRunning = false;
-let lastClipWriteTime = 0;
+let clipSaveRunning = false;
+let clipFetchRunning = false;
+let savePending = false;
 let lastSyncTime = 0;
 
-/** 粘贴板只从服务器初始化，不读取或广播浏览器中的旧内容。 */
+/** 粘贴板初始化：首次拉取云端内容，不设任何后台定时器 */
 function initClipboard() {
   setClipboardEnabled(false);
   updateSyncStatus('loading', '正在连接云端粘贴板…');
   updateClipMeta();
-  syncClipboard();
-  window.addEventListener('online', () => scheduleClipSync(0));
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) scheduleClipSync(0);
-  });
+  fetchClipboard(false);
 }
 
 function setClipboardEnabled(enabled) {
   ['#clipTextarea', '#drawerTextarea', '#btnPasteFromSys', '#btnClearClip'].forEach(selector => {
-    _qs(selector).disabled = !enabled;
+    const el = _qs(selector);
+    if (el) el.disabled = !enabled;
   });
 }
 
 function renderClipContent() {
   ['#clipTextarea', '#drawerTextarea'].forEach(selector => {
     const input = _qs(selector);
-    // 相同内容不重新赋值，以免移动正在编辑的光标。
-    if (input.value !== clipContent) input.value = clipContent;
+    if (input && input.value !== clipContent) input.value = clipContent;
   });
   if (isPreviewMode) renderMarkdownPreview();
   updateClipMeta();
 }
 
-/** 更新字数/行数统计 */
+/** 更新字数/行数与同步时间统计 */
 function updateClipMeta() {
   const txt = clipContent || '';
   const lines = txt.split('\\n').length;
-  _qs('#clipWordsMeta').textContent = \`字符: \${txt.length}\`;
-  _qs('#clipLinesMeta').textContent = \`行数: \${lines}\`;
-  const mins = Math.floor((Date.now() - lastSyncTime) / 60000);
-  _qs('#clipTimeMeta').textContent = clipDirty ? '修改尚未上传' : !lastSyncTime ? '尚未连接' : mins === 0 ? '刚刚同步' : \`\${mins} 分钟前同步\`;
+  const wordEl = _qs('#clipWordsMeta');
+  const lineEl = _qs('#clipLinesMeta');
+  const timeEl = _qs('#clipTimeMeta');
+  if (wordEl) wordEl.textContent = \`字符: \${txt.length}\`;
+  if (lineEl) lineEl.textContent = \`行数: \${lines}\`;
+  if (timeEl) {
+    const mins = Math.floor((Date.now() - lastSyncTime) / 60000);
+    timeEl.textContent = clipDirty
+      ? '内容有未保存的修改'
+      : !lastSyncTime
+      ? '尚未连接'
+      : mins === 0
+      ? '刚刚同步'
+      : \`\${mins} 分钟前同步\`;
+  }
 }
 
-function onClipInput(content) {
+/** 用户输入时仅更新本地视图和未保存状态，不发起请求、不设定时器 */
+function onClipInput(content, sourceEl) {
   if (!clipReady) return;
   clipContent = content;
-  clipDirty = true;
-  clipEditVersion++;
-  renderClipContent();
-  updateSyncStatus('syncing', '等待上传到云端…');
-  scheduleClipSync(1000);
+  const otherSelector = sourceEl === _qs('#clipTextarea') ? '#drawerTextarea' : '#clipTextarea';
+  const otherEl = _qs(otherSelector);
+  if (otherEl && otherEl.value !== content) {
+    otherEl.value = content;
+  }
+  if (isPreviewMode) renderMarkdownPreview();
+
+  if (clipContent !== clipSavedContent) {
+    clipDirty = true;
+    updateSyncStatus('dirty', '内容已修改（未保存）');
+  } else {
+    clipDirty = false;
+    updateSyncStatus('ready', '云端已就绪');
+  }
+  updateClipMeta();
 }
 
-function scheduleClipSync(delay) {
-  clearTimeout(clipSyncTimer);
-  // KV 同一键的写入至少间隔一秒；输入防抖也使用此间隔。
-  if (clipDirty) delay = Math.max(delay, 1000 - (Date.now() - lastClipWriteTime));
-  clipSyncTimer = setTimeout(syncClipboard, delay);
+/** 用户完成编辑失焦 (change) 时触发保存 */
+function onClipChange(content) {
+  if (!clipReady) return;
+  clipContent = content;
+  if (clipDirty || clipContent !== clipSavedContent) {
+    saveClipboard();
+  }
 }
 
-/** 单次只发送一个请求：有修改时上传，否则每三秒检查云端内容。 */
-async function syncClipboard() {
-  if (clipRequestRunning) return;
-  clearTimeout(clipSyncTimer);
-  clipRequestRunning = true;
-  const sending = clipDirty;
-  const editVersion = clipEditVersion;
+/** 从云端获取最新内容（仅初始化及点击刷新按钮时调用） */
+async function fetchClipboard(manual = false) {
+  if (clipFetchRunning) return;
+
+  if (manual && clipDirty) {
+    if (!confirm('当前有未保存的修改，刷新将丢弃本地修改并拉取云端内容，确定刷新吗？')) {
+      return;
+    }
+  }
+
+  clipFetchRunning = true;
+  const refreshBtns = [_qs('#btnRefreshClip'), _qs('#drawerRefreshBtn')].filter(Boolean);
+  refreshBtns.forEach(btn => {
+    btn.disabled = true;
+    const svg = btn.querySelector('svg');
+    if (svg) svg.classList.add('spin');
+  });
+
+  updateSyncStatus('loading', manual ? '正在刷新云端内容…' : '正在连接云端粘贴板…');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  let succeeded = false;
-  if (sending) {
-    lastClipWriteTime = Date.now();
-    updateSyncStatus('syncing', '正在上传到云端…');
-  }
+
   try {
-    const options = { cache: 'no-store', signal: controller.signal };
-    if (sending) Object.assign(options, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: clipContent }),
+    const response = await fetch('/api/clipboard', {
+      cache: 'no-store',
+      signal: controller.signal
     });
-    const response = await fetch('/api/clipboard', options);
     if (!response.ok) throw new Error('服务器连接失败');
     const data = await response.json();
     if (typeof data.content !== 'string' || typeof data.updatedAt !== 'number' || !Number.isFinite(data.updatedAt)) {
       throw new Error('服务器返回无效数据');
     }
-    if (sending) {
-      clipServerTime = Math.max(clipServerTime, data.updatedAt);
-      if (editVersion === clipEditVersion) clipDirty = false;
-    }
-    // 保护请求期间的新输入，并忽略 KV 传播过程中比已确认内容更旧的响应。
-    if (!clipDirty && editVersion === clipEditVersion && data.updatedAt >= clipServerTime) {
-      clipContent = data.content;
-      clipServerTime = data.updatedAt;
-      renderClipContent();
-    }
+
+    clipContent = data.content;
+    clipSavedContent = data.content;
+    clipServerTime = data.updatedAt;
+    clipDirty = false;
     clipReady = true;
-    setClipboardEnabled(true);
     lastSyncTime = Date.now();
-    succeeded = true;
-    updateSyncStatus(clipDirty ? 'syncing' : 'ready', clipDirty ? '等待上传到云端…' : '已连接云端，自动检查更新');
+    setClipboardEnabled(true);
+    renderClipContent();
+    updateSyncStatus('ready', manual ? '已获取云端最新内容' : '云端已就绪');
+    if (manual) toast('已获取最新云端内容 🔄', 'success');
   } catch (e) {
-    updateSyncStatus('error', clipDirty ? '同步失败，内容尚未上传，正在重试' : '云端连接失败，正在重试');
+    updateSyncStatus('error', manual ? '刷新失败，请检查网络' : '云端连接失败，可点击刷新重试');
+    if (manual) toast('刷新失败，请检查网络', 'error');
   } finally {
     clearTimeout(timeout);
-    clipRequestRunning = false;
+    clipFetchRunning = false;
+    refreshBtns.forEach(btn => {
+      btn.disabled = false;
+      const svg = btn.querySelector('svg');
+      if (svg) svg.classList.remove('spin');
+    });
     updateClipMeta();
-    scheduleClipSync(succeeded && clipDirty ? 1000 : 3000);
+  }
+}
+
+/** 保存内容到云端（仅在 change 事件、按钮操作或 Ctrl+S 时调用） */
+async function saveClipboard() {
+  if (!clipReady) return;
+  const currentVal = _qs('#clipTextarea') ? _qs('#clipTextarea').value : clipContent;
+  clipContent = currentVal;
+
+  if (currentVal === clipSavedContent && !clipDirty) return;
+
+  if (clipSaveRunning) {
+    savePending = true;
+    return;
+  }
+
+  clipSaveRunning = true;
+  savePending = false;
+  const contentToSend = currentVal;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  updateSyncStatus('syncing', '正在保存到云端…');
+
+  try {
+    const response = await fetch('/api/clipboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: contentToSend }),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error('保存失败');
+    const data = await response.json();
+    if (typeof data.content !== 'string' || typeof data.updatedAt !== 'number' || !Number.isFinite(data.updatedAt)) {
+      throw new Error('服务器返回无效数据');
+    }
+
+    clipServerTime = Math.max(clipServerTime, data.updatedAt);
+    lastSyncTime = Date.now();
+
+    const latestVal = _qs('#clipTextarea') ? _qs('#clipTextarea').value : clipContent;
+    if (latestVal === contentToSend) {
+      clipSavedContent = contentToSend;
+      clipContent = contentToSend;
+      clipDirty = false;
+      updateSyncStatus('ready', '已保存到云端');
+      toast('已保存到云端 💾', 'success');
+    } else {
+      clipDirty = true;
+      updateSyncStatus('dirty', '内容已修改（未保存）');
+    }
+  } catch (e) {
+    clipDirty = true;
+    updateSyncStatus('error', '保存失败，失焦或重试将再次保存');
+    toast('保存失败，请检查网络', 'error');
+  } finally {
+    clearTimeout(timeout);
+    clipSaveRunning = false;
+    updateClipMeta();
+    if (savePending) {
+      savePending = false;
+      saveClipboard();
+    }
   }
 }
 
@@ -3665,12 +4130,21 @@ function updateSyncStatus(state, text) {
   const indicator = _qs('#clipLiveIndicator');
   const statusText = _qs('#clipStatusText');
   const badge = _qs('#syncStatusBadge');
-  const online = state === 'ready';
-  indicator.className = \`live-indicator \${online ? 'online' : ''}\`;
-  statusText.textContent = text;
-  badge.textContent = online ? '● 云端共享' : state === 'error' ? '○ 同步失败' : '○ 连接 / 同步中';
-  badge.style.color = online ? 'var(--success)' : state === 'error' ? 'var(--danger)' : 'var(--warning)';
-  setCloudState('clipboard', state);
+  const isOnline = state === 'ready';
+  const isDirty = state === 'dirty';
+  const isError = state === 'error';
+
+  if (indicator) {
+    indicator.className = \`live-indicator \${isOnline ? 'online' : isDirty ? 'dirty' : ''}\`;
+  }
+  if (statusText) {
+    statusText.textContent = text;
+  }
+  if (badge) {
+    badge.textContent = isOnline ? '● 云端就绪' : isDirty ? '○ 未保存' : isError ? '○ 连接失败' : '○ 同步中';
+    badge.style.color = isOnline ? 'var(--success)' : isDirty ? 'var(--warning)' : isError ? 'var(--danger)' : 'var(--warning)';
+  }
+  setCloudState('clipboard', state === 'dirty' ? 'ready' : state);
 }
 
 function renderMarkdownPreview() {
@@ -3861,8 +4335,22 @@ function bindEvents() {
   _qs('#btnResetDefault').addEventListener('click', resetDefault);
 
   // --- 粘贴板主面板 ---
-  _qs('#clipTextarea').addEventListener('input', (e) => onClipInput(e.target.value));
+  const handleClipKeydown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      onClipChange(e.target.value);
+    }
+  };
+
+  _qs('#clipTextarea').addEventListener('input', (e) => onClipInput(e.target.value, e.target));
+  _qs('#clipTextarea').addEventListener('change', (e) => onClipChange(e.target.value));
+  _qs('#clipTextarea').addEventListener('keydown', handleClipKeydown);
   
+  const refreshClipBtn = _qs('#btnRefreshClip');
+  if (refreshClipBtn) {
+    refreshClipBtn.addEventListener('click', () => fetchClipboard(true));
+  }
+
   _qs('#btnModeEdit').addEventListener('click', () => {
     isPreviewMode = false;
     _qs('#clipTextarea').style.display = '';
@@ -3891,8 +4379,11 @@ function bindEvents() {
         var newContent = clipContent ? clipContent + '\\n' + text : text;
         _qs('#clipTextarea').value = newContent;
         _qs('#drawerTextarea').value = newContent;
-        onClipInput(newContent);
-        toast('已从系统剪贴板粘贴 📋', 'success');
+        clipContent = newContent;
+        clipDirty = true;
+        renderClipContent();
+        saveClipboard();
+        toast('已从系统剪贴板粘贴并保存 📋', 'success');
       }).catch(function() {
         toast('请直接在文本框中长按粘贴', 'warning');
       });
@@ -3906,8 +4397,11 @@ function bindEvents() {
     if (!confirm('确定要清空全部粘贴板内容吗？')) return;
     _qs('#clipTextarea').value = '';
     _qs('#drawerTextarea').value = '';
-    onClipInput('');
-    toast('粘贴板已清空', 'info');
+    clipContent = '';
+    clipDirty = true;
+    renderClipContent();
+    saveClipboard();
+    toast('粘贴板已清空并保存', 'info');
   });
 
   _qs('#clipQrBtn').addEventListener('click', function() { openQrModal(true); });
@@ -3915,12 +4409,30 @@ function bindEvents() {
   // --- 右侧抽屉快捷便签板 ---
   _qs('#openDrawerCapsule').addEventListener('click', function() { _qs('#quickDrawer').classList.add('open'); });
   _qs('#closeDrawerBtn').addEventListener('click', function() { _qs('#quickDrawer').classList.remove('open'); });
+  
   _qs('#drawerTextarea').addEventListener('input', function(e) {
-    _qs('#clipTextarea').value = e.target.value;
-    onClipInput(e.target.value);
+    onClipInput(e.target.value, e.target);
   });
+  _qs('#drawerTextarea').addEventListener('change', function(e) {
+    onClipChange(e.target.value);
+  });
+  _qs('#drawerTextarea').addEventListener('keydown', handleClipKeydown);
+
+  const drawerRefreshBtn = _qs('#drawerRefreshBtn');
+  if (drawerRefreshBtn) {
+    drawerRefreshBtn.addEventListener('click', () => fetchClipboard(true));
+  }
+
   _qs('#drawerCopyBtn').addEventListener('click', function() {
     copyTextCompat(clipContent, '便签内容已复制 ✅', '复制失败');
+  });
+
+  // 未保存编辑离开页面保护
+  window.addEventListener('beforeunload', function(e) {
+    if (clipDirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
   });
 
   // --- 扫码 QR 弹窗 ---

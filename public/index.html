@@ -27,6 +27,11 @@
       </span>
     </div>
     <div class="top-actions">
+      <!-- 管理员入口 -->
+      <button class="icon-btn admin-auth-btn" id="adminAuthBtn" title="管理员设置">
+        <svg id="adminAuthIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+        <span class="btn-text" id="adminAuthBtnText">管理员</span>
+      </button>
       <!-- 云端站点扫码互联 -->
       <button class="icon-btn" id="qrShareBtn" title="跨设备扫码同步">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M7 7h.01M17 7h.01M7 17h.01M17 17h.01"></path></svg>
@@ -183,6 +188,10 @@
               <button class="toggle-btn active" id="btnModeEdit">编辑模式</button>
               <button class="toggle-btn" id="btnModePreview">Markdown 预览</button>
             </div>
+            <button class="btn-secondary" id="btnRefreshClip" title="手动获取云端最新内容">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>刷新</span>
+            </button>
             <button class="btn-secondary" id="btnPasteFromSys" title="从本机剪贴板快速填入">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
               <span>快速粘贴</span>
@@ -197,7 +206,7 @@
 
         <div class="clipboard-editor-body">
           <!-- 实时编辑区域 -->
-          <textarea id="clipTextarea" class="clip-textarea" disabled placeholder="在此输入或粘贴内容，联网后自动上传；其他设备打开同一网址即可共享。"></textarea>
+          <textarea id="clipTextarea" class="clip-textarea" disabled placeholder="在此输入或粘贴内容，编辑完成失焦 (change) 后自动保存；点击“刷新”可拉取云端最新内容。"></textarea>
           
           <!-- Markdown 预览展示面板 -->
           <div id="clipPreviewPanel" class="clip-preview markdown-body" style="display: none;"></div>
@@ -206,7 +215,7 @@
         <div class="clipboard-footer-tips">
           <div class="tip-left">
             <span class="badge-tip">💡 协同说明</span>
-            <span>内容通过服务器共享，每 3 秒检查更新。请确认上传成功后再关闭页面；网络异常时会自动重试。</span>
+            <span>内容通过云端共享，编辑修改失焦 (change) 时自动保存。点击“刷新”获取云端最新内容。</span>
           </div>
           <button class="link-btn" id="clipQrBtn">📱 手机扫码直达本粘贴板</button>
         </div>
@@ -224,10 +233,14 @@
       <button class="drawer-close" id="closeDrawerBtn">✕</button>
     </div>
     <div class="drawer-body">
-      <textarea id="drawerTextarea" class="drawer-textarea" disabled placeholder="内容通过云端与其他设备共享，上传状态显示在页面左上角。"></textarea>
+      <textarea id="drawerTextarea" class="drawer-textarea" disabled placeholder="内容通过云端共享，失焦后自动保存；点击刷新可获取最新内容。"></textarea>
     </div>
-    <div class="drawer-footer">
-      <button class="btn-primary w-full" id="drawerCopyBtn">一键复制便签内容</button>
+    <div class="drawer-footer drawer-footer-actions">
+      <button class="btn-secondary" id="drawerRefreshBtn" title="刷新云端内容">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        <span>刷新</span>
+      </button>
+      <button class="btn-primary" id="drawerCopyBtn">一键复制便签</button>
     </div>
   </aside>
 
@@ -374,6 +387,85 @@
             <button class="btn-sm" id="btnCopyAddress">复制地址</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 弹窗 4: 管理员登录与设置模态框 ===================== -->
+  <div class="modal-overlay" id="adminModal">
+    <div class="modal-dialog glass-panel admin-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="adminModalTitle">管理员验证</h3>
+        <button class="modal-close" id="closeAdminModalBtn">✕</button>
+      </div>
+
+      <!-- 视图 A: 管理员登录验证视图 -->
+      <div class="modal-body admin-modal-body" id="adminLoginView">
+        <div class="admin-badge-banner">
+          <div class="admin-icon-circle">🔐</div>
+          <div>
+            <h4 class="admin-banner-title">需要管理员权限</h4>
+            <p class="admin-banner-desc">验证管理员密码后，本设备将<strong>永久保持授权</strong>，无需重复输入。</p>
+          </div>
+        </div>
+
+        <form id="adminLoginForm" class="modal-form">
+          <div class="form-group">
+            <label for="adminLoginPwd">管理员密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminLoginPwd" placeholder="请输入管理员密码" required autocomplete="current-password">
+              <button type="button" class="btn-toggle-pwd" id="toggleLoginPwdBtn" title="切换密码显示">👁</button>
+            </div>
+            <small class="form-hint" id="adminLoginHint">💡 初始默认密码为 <strong>admin</strong>，登录后支持自定义修改。</small>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancelAdminModalBtn">取消</button>
+            <button type="submit" class="btn-primary" id="submitAdminLoginBtn">登录并授权</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 视图 B: 管理员控制台与修改密码视图 -->
+      <div class="modal-body admin-modal-body" id="adminManageView" style="display: none;">
+        <div class="admin-status-card">
+          <div class="status-indicator-tag success">
+            <span class="dot"></span> 已永久授权
+          </div>
+          <p class="status-desc">当前设备已拥有最高管理权限。你可以随时修改管理密码或锁定退出。</p>
+        </div>
+
+        <form id="adminChangePwdForm" class="modal-form">
+          <h4 class="section-sub-title">修改管理员密码</h4>
+          <div class="form-group">
+            <label for="adminCurrentPwd">当前密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminCurrentPwd" placeholder="输入当前使用的密码" required autocomplete="current-password">
+              <button type="button" class="btn-toggle-pwd" id="toggleCurrentPwdBtn" title="切换显示">👁</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="adminNewPwd">自定义新密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminNewPwd" placeholder="设置新的管理员密码" minlength="4" required autocomplete="new-password">
+              <button type="button" class="btn-toggle-pwd" id="toggleNewPwdBtn" title="切换显示">👁</button>
+            </div>
+            <small class="form-hint">支持自定义任意字符（不少于4位），设置后立即保存在本设备。</small>
+          </div>
+
+          <div class="form-group">
+            <label for="adminConfirmPwd">确认新密码 <span class="req">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" id="adminConfirmPwd" placeholder="再次输入新密码" minlength="4" required autocomplete="new-password">
+            </div>
+          </div>
+
+          <div class="modal-actions space-between">
+            <button type="button" class="btn-danger-outline" id="btnAdminLogout" title="撤销本设备授权">退出授权并锁定</button>
+            <button type="submit" class="btn-primary" id="saveNewPwdBtn">保存新密码</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

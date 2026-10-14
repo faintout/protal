@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 极光导航 (Aurora Portal) - 前端主逻辑
  * 功能: 网站导航管理 + 多引擎搜索 + 互联网共享粘贴板
  */
@@ -11,6 +11,9 @@
 const STORAGE_KEY = 'aurora-portal-data-v2';
 const RECENT_KEY = 'aurora-recent-sites-v3';
 const BACKUP_KEY = 'aurora-before-import-v1';
+const ADMIN_PWD_KEY = 'aurora_admin_password';
+const ADMIN_AUTH_KEY = 'aurora_admin_authorized';
+const DEFAULT_ADMIN_PWD = 'admin';
 
 // 搜索引擎配置
 const ENGINES = {
@@ -122,6 +125,111 @@ function legacyCopy(text, successMsg, failMsg) {
   toast(ok ? successMsg : failMsg, ok ? 'success' : 'error');
 }
 
+
+/* =====================================================================
+   0.1 管理员权限与密码管理模块
+   ===================================================================== */
+let pendingAdminAction = null;
+
+/** 获取本地管理员密码（未初始化时自动初始化为默认密码 admin） */
+function getAdminPassword() {
+  let pwd = localStorage.getItem(ADMIN_PWD_KEY);
+  if (!pwd) {
+    pwd = DEFAULT_ADMIN_PWD;
+    localStorage.setItem(ADMIN_PWD_KEY, pwd);
+  }
+  return pwd;
+}
+
+/** 检查当前浏览器设备是否拥有永久有效授权 */
+function isAdminAuthorized() {
+  return localStorage.getItem(ADMIN_AUTH_KEY) === 'true';
+}
+
+/** 设置授权状态，更新页面顶栏按钮状态 */
+function setAdminAuthorized(authorized) {
+  if (authorized) {
+    localStorage.setItem(ADMIN_AUTH_KEY, 'true');
+  } else {
+    localStorage.removeItem(ADMIN_AUTH_KEY);
+  }
+  updateAdminBtnUI();
+}
+
+/** 更新顶部管理员按钮的外观与图标 */
+function updateAdminBtnUI() {
+  const btn = _qs('#adminAuthBtn');
+  const icon = _qs('#adminAuthIcon');
+  const text = _qs('#adminAuthBtnText');
+  if (!btn) return;
+  const authed = isAdminAuthorized();
+  if (authed) {
+    btn.classList.add('authed');
+    btn.title = '管理员设置（已授权）';
+    if (text) text.textContent = '已授权';
+    if (icon) {
+      icon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 019.9-1"></path>';
+    }
+  } else {
+    btn.classList.remove('authed');
+    btn.title = '管理员登录';
+    if (text) text.textContent = '管理员';
+    if (icon) {
+      icon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path>';
+    }
+  }
+}
+
+/** 打开管理员弹窗 */
+function openAdminModal(mode) {
+  const modal = _qs('#adminModal');
+  const loginView = _qs('#adminLoginView');
+  const manageView = _qs('#adminManageView');
+  const title = _qs('#adminModalTitle');
+  if (!modal) return;
+
+  const authed = isAdminAuthorized();
+  const showManage = mode === 'manage' || (mode !== 'login' && authed);
+
+  if (showManage) {
+    if (title) title.textContent = '管理员控制台';
+    if (loginView) loginView.style.display = 'none';
+    if (manageView) manageView.style.display = 'block';
+    // 重置修改密码表单
+    const changeForm = _qs('#adminChangePwdForm');
+    if (changeForm) changeForm.reset();
+  } else {
+    if (title) title.textContent = '管理员验证';
+    if (loginView) loginView.style.display = 'block';
+    if (manageView) manageView.style.display = 'none';
+    const pwdInput = _qs('#adminLoginPwd');
+    if (pwdInput) {
+      pwdInput.value = '';
+      setTimeout(() => pwdInput.focus(), 150);
+    }
+  }
+
+  modal.classList.add('open');
+}
+
+/** 关闭管理员弹窗 */
+function closeAdminModal() {
+  const modal = _qs('#adminModal');
+  if (modal) modal.classList.remove('open');
+  pendingAdminAction = null;
+}
+
+/** 拦截敏感操作：如未授权则弹窗，验证成功后自动执行回调 */
+function requireAdmin(actionCallback) {
+  if (isAdminAuthorized()) {
+    if (typeof actionCallback === 'function') actionCallback();
+    return true;
+  }
+  pendingAdminAction = actionCallback;
+  openAdminModal('login');
+  toast('此操作需要管理员权限，请先验证', 'warning');
+  return false;
+}
 
 /* ======================================================================
    1. 数据层 (服务器 KV 为主，LocalStorage 为快速缓存)
@@ -1160,120 +1268,208 @@ async function resetDefault() {
    8. 共享粘贴板逻辑
    ===================================================================== */
 let clipContent = '';
-let clipSyncTimer = null;
+let clipSavedContent = '';
 let isPreviewMode = false;
 let clipReady = false;
 let clipDirty = false;
-let clipEditVersion = 0;
 let clipServerTime = 0;
-let clipRequestRunning = false;
-let lastClipWriteTime = 0;
+let clipSaveRunning = false;
+let clipFetchRunning = false;
+let savePending = false;
 let lastSyncTime = 0;
 
-/** 粘贴板只从服务器初始化，不读取或广播浏览器中的旧内容。 */
+/** 粘贴板初始化：首次拉取云端内容，不设任何后台定时器 */
 function initClipboard() {
   setClipboardEnabled(false);
   updateSyncStatus('loading', '正在连接云端粘贴板…');
   updateClipMeta();
-  syncClipboard();
-  window.addEventListener('online', () => scheduleClipSync(0));
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) scheduleClipSync(0);
-  });
+  fetchClipboard(false);
 }
 
 function setClipboardEnabled(enabled) {
   ['#clipTextarea', '#drawerTextarea', '#btnPasteFromSys', '#btnClearClip'].forEach(selector => {
-    _qs(selector).disabled = !enabled;
+    const el = _qs(selector);
+    if (el) el.disabled = !enabled;
   });
 }
 
 function renderClipContent() {
   ['#clipTextarea', '#drawerTextarea'].forEach(selector => {
     const input = _qs(selector);
-    // 相同内容不重新赋值，以免移动正在编辑的光标。
-    if (input.value !== clipContent) input.value = clipContent;
+    if (input && input.value !== clipContent) input.value = clipContent;
   });
   if (isPreviewMode) renderMarkdownPreview();
   updateClipMeta();
 }
 
-/** 更新字数/行数统计 */
+/** 更新字数/行数与同步时间统计 */
 function updateClipMeta() {
   const txt = clipContent || '';
   const lines = txt.split('\n').length;
-  _qs('#clipWordsMeta').textContent = `字符: ${txt.length}`;
-  _qs('#clipLinesMeta').textContent = `行数: ${lines}`;
-  const mins = Math.floor((Date.now() - lastSyncTime) / 60000);
-  _qs('#clipTimeMeta').textContent = clipDirty ? '修改尚未上传' : !lastSyncTime ? '尚未连接' : mins === 0 ? '刚刚同步' : `${mins} 分钟前同步`;
+  const wordEl = _qs('#clipWordsMeta');
+  const lineEl = _qs('#clipLinesMeta');
+  const timeEl = _qs('#clipTimeMeta');
+  if (wordEl) wordEl.textContent = `字符: ${txt.length}`;
+  if (lineEl) lineEl.textContent = `行数: ${lines}`;
+  if (timeEl) {
+    const mins = Math.floor((Date.now() - lastSyncTime) / 60000);
+    timeEl.textContent = clipDirty
+      ? '内容有未保存的修改'
+      : !lastSyncTime
+      ? '尚未连接'
+      : mins === 0
+      ? '刚刚同步'
+      : `${mins} 分钟前同步`;
+  }
 }
 
-function onClipInput(content) {
+/** 用户输入时仅更新本地视图和未保存状态，不发起请求、不设定时器 */
+function onClipInput(content, sourceEl) {
   if (!clipReady) return;
   clipContent = content;
-  clipDirty = true;
-  clipEditVersion++;
-  renderClipContent();
-  updateSyncStatus('syncing', '等待上传到云端…');
-  scheduleClipSync(1000);
+  const otherSelector = sourceEl === _qs('#clipTextarea') ? '#drawerTextarea' : '#clipTextarea';
+  const otherEl = _qs(otherSelector);
+  if (otherEl && otherEl.value !== content) {
+    otherEl.value = content;
+  }
+  if (isPreviewMode) renderMarkdownPreview();
+
+  if (clipContent !== clipSavedContent) {
+    clipDirty = true;
+    updateSyncStatus('dirty', '内容已修改（未保存）');
+  } else {
+    clipDirty = false;
+    updateSyncStatus('ready', '云端已就绪');
+  }
+  updateClipMeta();
 }
 
-function scheduleClipSync(delay) {
-  clearTimeout(clipSyncTimer);
-  // KV 同一键的写入至少间隔一秒；输入防抖也使用此间隔。
-  if (clipDirty) delay = Math.max(delay, 1000 - (Date.now() - lastClipWriteTime));
-  clipSyncTimer = setTimeout(syncClipboard, delay);
+/** 用户完成编辑失焦 (change) 时触发保存 */
+function onClipChange(content) {
+  if (!clipReady) return;
+  clipContent = content;
+  if (clipDirty || clipContent !== clipSavedContent) {
+    saveClipboard();
+  }
 }
 
-/** 单次只发送一个请求：有修改时上传，否则每三秒检查云端内容。 */
-async function syncClipboard() {
-  if (clipRequestRunning) return;
-  clearTimeout(clipSyncTimer);
-  clipRequestRunning = true;
-  const sending = clipDirty;
-  const editVersion = clipEditVersion;
+/** 从云端获取最新内容（仅初始化及点击刷新按钮时调用） */
+async function fetchClipboard(manual = false) {
+  if (clipFetchRunning) return;
+
+  if (manual && clipDirty) {
+    if (!confirm('当前有未保存的修改，刷新将丢弃本地修改并拉取云端内容，确定刷新吗？')) {
+      return;
+    }
+  }
+
+  clipFetchRunning = true;
+  const refreshBtns = [_qs('#btnRefreshClip'), _qs('#drawerRefreshBtn')].filter(Boolean);
+  refreshBtns.forEach(btn => {
+    btn.disabled = true;
+    const svg = btn.querySelector('svg');
+    if (svg) svg.classList.add('spin');
+  });
+
+  updateSyncStatus('loading', manual ? '正在刷新云端内容…' : '正在连接云端粘贴板…');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  let succeeded = false;
-  if (sending) {
-    lastClipWriteTime = Date.now();
-    updateSyncStatus('syncing', '正在上传到云端…');
-  }
+
   try {
-    const options = { cache: 'no-store', signal: controller.signal };
-    if (sending) Object.assign(options, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: clipContent }),
+    const response = await fetch('/api/clipboard', {
+      cache: 'no-store',
+      signal: controller.signal
     });
-    const response = await fetch('/api/clipboard', options);
     if (!response.ok) throw new Error('服务器连接失败');
     const data = await response.json();
     if (typeof data.content !== 'string' || typeof data.updatedAt !== 'number' || !Number.isFinite(data.updatedAt)) {
       throw new Error('服务器返回无效数据');
     }
-    if (sending) {
-      clipServerTime = Math.max(clipServerTime, data.updatedAt);
-      if (editVersion === clipEditVersion) clipDirty = false;
-    }
-    // 保护请求期间的新输入，并忽略 KV 传播过程中比已确认内容更旧的响应。
-    if (!clipDirty && editVersion === clipEditVersion && data.updatedAt >= clipServerTime) {
-      clipContent = data.content;
-      clipServerTime = data.updatedAt;
-      renderClipContent();
-    }
+
+    clipContent = data.content;
+    clipSavedContent = data.content;
+    clipServerTime = data.updatedAt;
+    clipDirty = false;
     clipReady = true;
-    setClipboardEnabled(true);
     lastSyncTime = Date.now();
-    succeeded = true;
-    updateSyncStatus(clipDirty ? 'syncing' : 'ready', clipDirty ? '等待上传到云端…' : '已连接云端，自动检查更新');
+    setClipboardEnabled(true);
+    renderClipContent();
+    updateSyncStatus('ready', manual ? '已获取云端最新内容' : '云端已就绪');
+    if (manual) toast('已获取最新云端内容 🔄', 'success');
   } catch (e) {
-    updateSyncStatus('error', clipDirty ? '同步失败，内容尚未上传，正在重试' : '云端连接失败，正在重试');
+    updateSyncStatus('error', manual ? '刷新失败，请检查网络' : '云端连接失败，可点击刷新重试');
+    if (manual) toast('刷新失败，请检查网络', 'error');
   } finally {
     clearTimeout(timeout);
-    clipRequestRunning = false;
+    clipFetchRunning = false;
+    refreshBtns.forEach(btn => {
+      btn.disabled = false;
+      const svg = btn.querySelector('svg');
+      if (svg) svg.classList.remove('spin');
+    });
     updateClipMeta();
-    scheduleClipSync(succeeded && clipDirty ? 1000 : 3000);
+  }
+}
+
+/** 保存内容到云端（仅在 change 事件、按钮操作或 Ctrl+S 时调用） */
+async function saveClipboard() {
+  if (!clipReady) return;
+  const currentVal = _qs('#clipTextarea') ? _qs('#clipTextarea').value : clipContent;
+  clipContent = currentVal;
+
+  if (currentVal === clipSavedContent && !clipDirty) return;
+
+  if (clipSaveRunning) {
+    savePending = true;
+    return;
+  }
+
+  clipSaveRunning = true;
+  savePending = false;
+  const contentToSend = currentVal;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  updateSyncStatus('syncing', '正在保存到云端…');
+
+  try {
+    const response = await fetch('/api/clipboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: contentToSend }),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error('保存失败');
+    const data = await response.json();
+    if (typeof data.content !== 'string' || typeof data.updatedAt !== 'number' || !Number.isFinite(data.updatedAt)) {
+      throw new Error('服务器返回无效数据');
+    }
+
+    clipServerTime = Math.max(clipServerTime, data.updatedAt);
+    lastSyncTime = Date.now();
+
+    const latestVal = _qs('#clipTextarea') ? _qs('#clipTextarea').value : clipContent;
+    if (latestVal === contentToSend) {
+      clipSavedContent = contentToSend;
+      clipContent = contentToSend;
+      clipDirty = false;
+      updateSyncStatus('ready', '已保存到云端');
+      toast('已保存到云端 💾', 'success');
+    } else {
+      clipDirty = true;
+      updateSyncStatus('dirty', '内容已修改（未保存）');
+    }
+  } catch (e) {
+    clipDirty = true;
+    updateSyncStatus('error', '保存失败，失焦或重试将再次保存');
+    toast('保存失败，请检查网络', 'error');
+  } finally {
+    clearTimeout(timeout);
+    clipSaveRunning = false;
+    updateClipMeta();
+    if (savePending) {
+      savePending = false;
+      saveClipboard();
+    }
   }
 }
 
@@ -1281,12 +1477,21 @@ function updateSyncStatus(state, text) {
   const indicator = _qs('#clipLiveIndicator');
   const statusText = _qs('#clipStatusText');
   const badge = _qs('#syncStatusBadge');
-  const online = state === 'ready';
-  indicator.className = `live-indicator ${online ? 'online' : ''}`;
-  statusText.textContent = text;
-  badge.textContent = online ? '● 云端共享' : state === 'error' ? '○ 同步失败' : '○ 连接 / 同步中';
-  badge.style.color = online ? 'var(--success)' : state === 'error' ? 'var(--danger)' : 'var(--warning)';
-  setCloudState('clipboard', state);
+  const isOnline = state === 'ready';
+  const isDirty = state === 'dirty';
+  const isError = state === 'error';
+
+  if (indicator) {
+    indicator.className = `live-indicator ${isOnline ? 'online' : isDirty ? 'dirty' : ''}`;
+  }
+  if (statusText) {
+    statusText.textContent = text;
+  }
+  if (badge) {
+    badge.textContent = isOnline ? '● 云端就绪' : isDirty ? '○ 未保存' : isError ? '○ 连接失败' : '○ 同步中';
+    badge.style.color = isOnline ? 'var(--success)' : isDirty ? 'var(--warning)' : isError ? 'var(--danger)' : 'var(--warning)';
+  }
+  setCloudState('clipboard', state === 'dirty' ? 'ready' : state);
 }
 
 function renderMarkdownPreview() {
@@ -1477,8 +1682,22 @@ function bindEvents() {
   _qs('#btnResetDefault').addEventListener('click', resetDefault);
 
   // --- 粘贴板主面板 ---
-  _qs('#clipTextarea').addEventListener('input', (e) => onClipInput(e.target.value));
+  const handleClipKeydown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      onClipChange(e.target.value);
+    }
+  };
+
+  _qs('#clipTextarea').addEventListener('input', (e) => onClipInput(e.target.value, e.target));
+  _qs('#clipTextarea').addEventListener('change', (e) => onClipChange(e.target.value));
+  _qs('#clipTextarea').addEventListener('keydown', handleClipKeydown);
   
+  const refreshClipBtn = _qs('#btnRefreshClip');
+  if (refreshClipBtn) {
+    refreshClipBtn.addEventListener('click', () => fetchClipboard(true));
+  }
+
   _qs('#btnModeEdit').addEventListener('click', () => {
     isPreviewMode = false;
     _qs('#clipTextarea').style.display = '';
@@ -1507,8 +1726,11 @@ function bindEvents() {
         var newContent = clipContent ? clipContent + '\n' + text : text;
         _qs('#clipTextarea').value = newContent;
         _qs('#drawerTextarea').value = newContent;
-        onClipInput(newContent);
-        toast('已从系统剪贴板粘贴 📋', 'success');
+        clipContent = newContent;
+        clipDirty = true;
+        renderClipContent();
+        saveClipboard();
+        toast('已从系统剪贴板粘贴并保存 📋', 'success');
       }).catch(function() {
         toast('请直接在文本框中长按粘贴', 'warning');
       });
@@ -1522,8 +1744,11 @@ function bindEvents() {
     if (!confirm('确定要清空全部粘贴板内容吗？')) return;
     _qs('#clipTextarea').value = '';
     _qs('#drawerTextarea').value = '';
-    onClipInput('');
-    toast('粘贴板已清空', 'info');
+    clipContent = '';
+    clipDirty = true;
+    renderClipContent();
+    saveClipboard();
+    toast('粘贴板已清空并保存', 'info');
   });
 
   _qs('#clipQrBtn').addEventListener('click', function() { openQrModal(true); });
@@ -1531,12 +1756,30 @@ function bindEvents() {
   // --- 右侧抽屉快捷便签板 ---
   _qs('#openDrawerCapsule').addEventListener('click', function() { _qs('#quickDrawer').classList.add('open'); });
   _qs('#closeDrawerBtn').addEventListener('click', function() { _qs('#quickDrawer').classList.remove('open'); });
+  
   _qs('#drawerTextarea').addEventListener('input', function(e) {
-    _qs('#clipTextarea').value = e.target.value;
-    onClipInput(e.target.value);
+    onClipInput(e.target.value, e.target);
   });
+  _qs('#drawerTextarea').addEventListener('change', function(e) {
+    onClipChange(e.target.value);
+  });
+  _qs('#drawerTextarea').addEventListener('keydown', handleClipKeydown);
+
+  const drawerRefreshBtn = _qs('#drawerRefreshBtn');
+  if (drawerRefreshBtn) {
+    drawerRefreshBtn.addEventListener('click', () => fetchClipboard(true));
+  }
+
   _qs('#drawerCopyBtn').addEventListener('click', function() {
     copyTextCompat(clipContent, '便签内容已复制 ✅', '复制失败');
+  });
+
+  // 未保存编辑离开页面保护
+  window.addEventListener('beforeunload', function(e) {
+    if (clipDirty) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
   });
 
   // --- 扫码 QR 弹窗 ---
